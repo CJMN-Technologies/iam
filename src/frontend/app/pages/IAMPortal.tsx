@@ -52,25 +52,14 @@ export const LRT2_STATIONS = [
   "V. Mapa", "Pureza", "Legarda", "Recto"
 ];
 
-const INITIAL_USERS: DirectoryUser[] = [
-  { id: "1", username: "CCO0012", firstName: "Joshua", lastName: "Montano",   role: "Command Center Officer", mobile: "09171234567", email: "joshua@lrta.gov.ph",        status: "active" },
-  { id: "2", username: "GCS0084", firstName: "Juan",   lastName: "Dela Cruz", role: "Ground Control Staff",   mobile: "09189876543", email: "juan.delacruz@lrta.gov.ph", status: "active", station: "Araneta Center-Cubao" },
-  { id: "3", username: "GCS0041", firstName: "Maria",  lastName: "Santos",    role: "Ground Control Staff",   mobile: "09191112222", email: "maria.santos@lrta.gov.ph",  status: "inactive", station: "Antipolo" },
-];
+const INITIAL_USERS: DirectoryUser[] = [];
 
-const AUDIT_LOGS: AuditEntry[] = [
-  { id: "a1", timestamp: "2026-04-19 10:45:12", actor: "SA-001",           action: "ACCOUNT_PROVISIONED", target: "GCS0084",  result: "success" },
-  { id: "a2", timestamp: "2026-04-19 10:45:15", actor: "SYSTEM",           action: "CREDENTIAL_SMS_SENT", target: "GCS0084",  result: "success" },
-  { id: "a3", timestamp: "2026-04-19 09:30:00", actor: "SA-002",           action: "ACCESS_REVOKED",      target: "CCO0012",  result: "success" },
-  { id: "a4", timestamp: "2026-04-19 08:15:22", actor: "SYSTEM",           action: "SMS_DELIVERY_FAILED", target: "GCS0041",  result: "error" },
-  { id: "a5", timestamp: "2026-04-18 23:10:05", actor: "admin_joshua",     action: "LOGIN_FAILED",        target: "admin_joshua", result: "warning" },
-  { id: "a6", timestamp: "2026-04-18 22:00:00", actor: "SA-001",           action: "ACCOUNT_PROVISIONED", target: "CCO0044",  result: "success" },
-];
+const AUDIT_LOGS: AuditEntry[] = [];
 
 const ROLES = ["All Roles", "Command Center Officer", "Ground Control Staff"];
 
 // ─── Toggle Switch ────────────────────────────────────────────────────────────
-function ToggleSwitch({ active, onToggle }: { active: boolean; onToggle: () => void }) {
+function ToggleSwitch({ active, onToggle }: { readonly active: boolean; readonly onToggle: () => void }) {
   return (
     <button
       type="button"
@@ -95,7 +84,7 @@ function ToggleSwitch({ active, onToggle }: { active: boolean; onToggle: () => v
 }
 
 // ─── Active Directory Tab ─────────────────────────────────────────────────────
-function ActiveDirectoryTab({ users, setUsers }: { users: DirectoryUser[], setUsers: React.Dispatch<React.SetStateAction<DirectoryUser[]>> }) {
+function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser[], readonly setUsers: React.Dispatch<React.SetStateAction<DirectoryUser[]>> }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("All Roles");
   const [roleOpen, setRoleOpen] = useState(false);
@@ -140,7 +129,7 @@ function ActiveDirectoryTab({ users, setUsers }: { users: DirectoryUser[], setUs
                 System User Directory
               </h2>
               <p style={{ fontSize: "0.78rem", color: "#6B7280", marginTop: 2 }}>
-                {filtered.length} user{filtered.length !== 1 ? "s" : ""} found
+                {filtered.length} user{filtered.length === 1 ? "" : "s"} found
               </p>
             </div>
 
@@ -274,8 +263,8 @@ function ActiveDirectoryTab({ users, setUsers }: { users: DirectoryUser[], setUs
                     borderBottom: idx < filtered.length - 1 ? "1px solid #F3F4F6" : "none",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "#FAFAFA")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#FAFAFA")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   {/* Username */}
                   <td style={{ padding: "14px 20px" }}>
@@ -342,12 +331,12 @@ function ActiveDirectoryTab({ users, setUsers }: { users: DirectoryUser[], setUs
                         transition: "all 0.15s",
                       }}
                       onMouseEnter={(e) => {
-                        const b = e.currentTarget as HTMLButtonElement;
+                        const b = e.currentTarget;
                         b.style.borderColor = "#4B0082";
                         b.style.color = "#4B0082";
                       }}
                       onMouseLeave={(e) => {
-                        const b = e.currentTarget as HTMLButtonElement;
+                        const b = e.currentTarget;
                         b.style.borderColor = "#E5E7EB";
                         b.style.color = "#374151";
                       }}
@@ -477,18 +466,18 @@ function ActiveDirectoryTab({ users, setUsers }: { users: DirectoryUser[], setUs
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                       <span className="text-xs font-medium text-gray-500">Predictions Reviewed</span>
-                      <span className="text-xl font-bold text-[#4B0082]">1,420</span>
+                      <span className="text-xl font-bold text-[#4B0082]">0</span>
                     </div>
                     <div className="flex flex-col gap-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                       <span className="text-xs font-medium text-gray-500">Alerts Processed</span>
-                      <span className="text-xl font-bold text-[#4B0082]">350</span>
+                      <span className="text-xl font-bold text-[#4B0082]">0</span>
                     </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                       <span className="text-xs font-medium text-gray-500">Incident Reports Filed</span>
-                      <span className="text-xl font-bold text-[#4B0082]">12</span>
+                      <span className="text-xl font-bold text-[#4B0082]">0</span>
                     </div>
                     <div className="flex flex-col gap-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                       <span className="text-xs font-medium text-gray-500">Assigned Stations</span>
@@ -512,21 +501,28 @@ function ActiveDirectoryTab({ users, setUsers }: { users: DirectoryUser[], setUs
 }
 
 // ─── Provision New Account Tab ────────────────────────────────────────────────
-function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: DirectoryUser) => void, onSuccess: () => void, usersLength: number }) {
-  const [form, setForm] = useState({
+function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUser: (u: DirectoryUser) => void, readonly onSuccess: () => void, readonly usersLength: number }) {
+  const [form, setForm] = useState<{
+    firstName: string;
+    lastName: string;
+    role: string;
+    email: string;
+    mobile: string;
+    imagePreview: string | null;
+  }>({
     firstName: "",
     lastName: "",
     role: "",
     email: "",
     mobile: "",
-    imagePreview: null as string | null,
+    imagePreview: null,
   });
 
   const handleChange = (field: string, value: string | null) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files?.[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -537,7 +533,12 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
   };
 
   // Dynamic generation
-  const rolePrefix = form.role === "Ground Control Staff" ? "GCS" : form.role === "Command Center Officer" ? "CCO" : "";
+  let rolePrefix = "";
+  if (form.role === "Ground Control Staff") {
+    rolePrefix = "GCS";
+  } else if (form.role === "Command Center Officer") {
+    rolePrefix = "CCO";
+  }
   const autoUsername = React.useMemo(() => {
     if (!rolePrefix) return "";
     return `${rolePrefix}${String(usersLength + 10).padStart(4, '0')}`;
@@ -548,7 +549,7 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
     return `${rolePrefix}-${(Math.floor(Math.random() * 9000) + 1000).toString(16).toUpperCase()}`;
   }, [rolePrefix]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     onAddUser({
@@ -615,8 +616,9 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
       <form onSubmit={handleSubmit} className="px-6 py-6 grid grid-cols-2 gap-5">
         {/* Row 1 */}
         <div className="col-span-1">
-          <label style={labelStyle}>First Name</label>
+          <label htmlFor="firstName" style={labelStyle}>First Name</label>
           <input
+            id="firstName"
             required
             value={form.firstName}
             onChange={(e) => handleChange("firstName", e.target.value)}
@@ -628,8 +630,9 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
         </div>
 
         <div className="col-span-1">
-          <label style={labelStyle}>Last Name</label>
+          <label htmlFor="lastName" style={labelStyle}>Last Name</label>
           <input
+            id="lastName"
             required
             value={form.lastName}
             onChange={(e) => handleChange("lastName", e.target.value)}
@@ -642,9 +645,10 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
 
         {/* Row 2 */}
         <div className="col-span-1">
-          <label style={labelStyle}>System Role</label>
+          <label htmlFor="role" style={labelStyle}>System Role</label>
           <div className="relative">
             <select
+              id="role"
               required
               value={form.role}
               onChange={(e) => handleChange("role", e.target.value)}
@@ -661,8 +665,9 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
         </div>
 
         <div className="col-span-1">
-          <label style={labelStyle}>Email Address</label>
+          <label htmlFor="email" style={labelStyle}>Email Address</label>
           <input
+            id="email"
             type="email"
             value={form.email}
             onChange={(e) => handleChange("email", e.target.value)}
@@ -675,8 +680,9 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
 
         {/* Row 3 */}
         <div className="col-span-1">
-          <label style={labelStyle}>System Username</label>
+          <label htmlFor="systemUsername" style={labelStyle}>System Username</label>
           <input
+            id="systemUsername"
             readOnly
             value={autoUsername}
             placeholder="Auto-generated based on role"
@@ -690,8 +696,9 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
         </div>
 
         <div className="col-span-1">
-          <label style={labelStyle}>Mobile Number</label>
+          <label htmlFor="mobile" style={labelStyle}>Mobile Number</label>
           <input
+            id="mobile"
             type="tel"
             value={form.mobile}
             onChange={(e) => {
@@ -707,7 +714,7 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
 
         {/* Row 4 */}
         <div className="col-span-1">
-          <label style={labelStyle}>Generated Security Key</label>
+          <div style={labelStyle}>Generated Security Key</div>
           <div
             style={{
               width: "100%",
@@ -730,7 +737,7 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { onAddUser: (u: Di
         </div>
 
         <div className="col-span-1">
-          <label style={labelStyle}>Personnel Image (Optional)</label>
+          <div style={labelStyle}>Personnel Image (Optional)</div>
           <label
             className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed transition-colors relative overflow-hidden group"
             style={{
@@ -870,8 +877,8 @@ function AuditLogsTab() {
                     borderBottom: idx < AUDIT_LOGS.length - 1 ? "1px solid #F3F4F6" : "none",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "#FAFAFA")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#FAFAFA")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <td style={{ padding: "13px 20px", fontFamily: "monospace", fontSize: "0.78rem", color: "#6B7280", whiteSpace: "nowrap" }}>
                     {entry.timestamp}
@@ -964,7 +971,7 @@ export function IAMPortal() {
       >
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center h-[52px]">
-            <img src={lrtLogo} alt="LRT-2 Logo" className="h-full w-auto object-contain drop-shadow-md" />
+            <img src={lrtLogo.src} alt="LRT-2 Logo" className="h-full w-auto object-contain drop-shadow-md" />
           </div>
           <div className="flex flex-col justify-center h-[52px]">
             <h1 className="text-white font-bold tracking-wide leading-tight" style={{ fontSize: "1.25rem", letterSpacing: "0.02em" }}>Identity & Access Management Portal</h1>

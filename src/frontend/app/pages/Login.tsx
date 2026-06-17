@@ -84,7 +84,7 @@ export function Login() {
   };
 
   const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    async (e: React.SyntheticEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (loading) return;
       setError("");
@@ -140,7 +140,7 @@ export function Login() {
             <div className="flex items-center w-full max-w-[28rem] mb-1 pl-1">
               {/* Literal logo only, no container */}
               <img
-                src={newLrtLogo}
+                src={newLrtLogo.src}
                 alt="LRT-2 Logo"
                 style={{
                   width: 96,
@@ -363,7 +363,7 @@ export function Login() {
                       className="w-4 h-4 rounded accent-[#4B0082]"
                       style={{ accentColor: "#4B0082" }}
                     />
-                    Remember me
+                    <span>Remember me</span>
                   </label>
                   <button
                     type="button"
@@ -403,12 +403,12 @@ export function Login() {
                   }}
                   onMouseEnter={(e) => {
                     if (!loading) {
-                      (e.currentTarget as HTMLButtonElement).style.background = "#3d006a";
+                      e.currentTarget.style.background = "#3d006a";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!loading) {
-                      (e.currentTarget as HTMLButtonElement).style.background = "#4B0082";
+                      e.currentTarget.style.background = "#4B0082";
                     }
                   }}
                 >

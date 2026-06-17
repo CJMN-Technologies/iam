@@ -1,11 +1,31 @@
+# Group 11 Superadmin (Web Admin Portal)
 
-  # Group 11 - Super Admin (Copy)
+A secure Next.js web portal dedicated to Identity and Access Management (IAM) and system oversight for Super Administrators.
 
-  This is a code bundle for Group 11 - Super Admin (Copy). The original project is available at https://www.figma.com/design/aWmwGMEbSETw707S73OkUO/Group-11---Super-Admin--Copy-.
+## Tech Stack
+- **Framework:** Next.js (v16.2)
+- **Styling:** TailwindCSS (v4.1)
+- **UI Components:** Radix UI primitives
+- **Data Visualization:** Recharts
+- **Icons:** Lucide React
+- **Package Manager:** Designed with `pnpm` in mind, but supports `npm`.
 
-  ## Running the code
+## Installation & Execution
 
-  Run `npm i` to install the dependencies.
+1. Navigate to the superadmin directory:
+   ```bash
+   cd Group11superadmin
+   ```
 
-  Run `npm run dev` to start the development server.
-  
+2. Install the dependencies:
+   ```bash
+   npm install
+   # or `pnpm install`
+   ```
+
+3. Run the Next.js development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Access the web interface at the localhost port provided in the terminal (usually `http://localhost:3000`).
