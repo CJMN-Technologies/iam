@@ -9,6 +9,7 @@ import {
   Loader2,
 } from "lucide-react";
 import newLrtLogo from "../../imports/image-removebg-preview_(1)-1.png";
+import { supabase } from "../../../backend/supabase";
 
 const BG_IMAGE =
   "https://images.unsplash.com/photo-1665148522404-14fd426c2e50?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxMUlQlMjBMaW5lJTIwMiUyMHN0YXRpb24lMjBwbGF0Zm9ybSUyMGFuZCUyMHRyYWNrc3xlbnwxfHx8fDE3NzY2MTQ5OTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral";
@@ -70,7 +71,7 @@ function ParticleBackground() {
 
 export function Login() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -90,18 +91,27 @@ export function Login() {
       setError("");
       setLoading(true);
 
-      await new Promise((r) => setTimeout(r, 1500));
+      if (email.trim() && password.trim()) {
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password,
+        });
 
-      if (username.trim() && password.trim()) {
-        sessionStorage.setItem("isAuthenticated", "true");
-        navigate("/iam-portal");
+        if (authError) {
+          setLoading(false);
+          setError(authError.message);
+          triggerShake();
+        } else {
+          sessionStorage.setItem("isAuthenticated", "true");
+          navigate("/iam-portal");
+        }
       } else {
         setLoading(false);
-        setError("Please enter both username and password.");
+        setError("Please enter both email and password.");
         triggerShake();
       }
     },
-    [username, password, loading, navigate]
+    [email, password, loading, navigate]
   );
 
   return (
@@ -258,24 +268,24 @@ export function Login() {
               </AnimatePresence>
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-5" autoComplete="on">
-                {/* Username */}
+                {/* Email */}
                 <div className="flex flex-col gap-1.5">
                   <label
-                    htmlFor="username"
+                    htmlFor="email"
                     className="text-gray-700"
                     style={{ fontSize: "0.82rem", fontWeight: 600 }}
                   >
-                    Username
+                    Email Address
                   </label>
                   <input
-                    id="username"
-                    name="username"
-                    type="text"
-                    autoComplete="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="Enter admin username"
+                    placeholder="Enter admin email"
                     style={{
                       fontFamily: "'Inter', sans-serif",
                       background: "#FAFAFA",

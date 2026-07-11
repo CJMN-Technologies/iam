@@ -18,31 +18,48 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast, Toaster } from "sonner";
+import { supabase } from "../../../backend/supabase";
 import lrtLogo from "../../imports/image-removebg-preview_(1).png";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type Tab = "active-directory" | "provision" | "audit-logs";
+type Tab = "active-directory" | "provision" | "audit-logs" | "scraper-feed" | "calendar-monitor";
 type UserStatus = "active" | "inactive";
 
 interface DirectoryUser {
   id: string;
   username: string;
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   role: string;
   mobile: string;
   email: string;
   status: UserStatus;
   station?: string;
+  photo_url?: string;
+  security_key?: string;
 }
 
 interface AuditEntry {
   id: string;
-  timestamp: string;
-  actor: string;
+  created_at: string;
+  actor_username: string;
   action: string;
   target: string;
   result: "success" | "warning" | "error";
+}
+
+interface ScraperEvent {
+  id: string;
+  source_name: string;
+  post_text: string;
+  category: string;
+  post_date: string;
+}
+
+interface CalendarMonitor {
+  table_name: string;
+  rows_processed: number;
+  last_processed_at: string;
 }
 
 // ─── Demo Data ───────────────────────────────────────────────────────────────
@@ -52,9 +69,9 @@ export const LRT2_STATIONS = [
   "V. Mapa", "Pureza", "Legarda", "Recto"
 ];
 
-const INITIAL_USERS: DirectoryUser[] = [];
 
-const AUDIT_LOGS: AuditEntry[] = [];
+
+
 
 const ROLES = ["All Roles", "Command Center Officer", "Ground Control Staff"];
 
@@ -89,28 +106,39 @@ function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser
   const [roleFilter, setRoleFilter] = useState("All Roles");
   const [roleOpen, setRoleOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<DirectoryUser | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const toggleStatus = (id: string) => {
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === id ? { ...u, status: u.status === "active" ? "inactive" : "active" } : u
-      )
-    );
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, roleFilter]);
+
+  const toggleStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    const { error } = await supabase.schema('iam').from('users').update({ status: newStatus }).eq('id', id);
+    if (error) {
+      toast.error("Failed to update status");
+      return;
+    }
+    setUsers((prev) => prev.map((u) => u.id === id ? { ...u, status: newStatus as UserStatus } : u));
     if (selectedUser?.id === id) {
-      setSelectedUser(prev => prev ? { ...prev, status: prev.status === "active" ? "inactive" : "active" } : null);
+      setSelectedUser(prev => prev ? { ...prev, status: newStatus as UserStatus } : null);
     }
   };
 
   const filtered = users.filter((u) => {
     const matchSearch =
       u.username.toLowerCase().includes(search.toLowerCase()) ||
-      u.firstName.toLowerCase().includes(search.toLowerCase()) ||
-      u.lastName.toLowerCase().includes(search.toLowerCase()) ||
+      u.first_name.toLowerCase().includes(search.toLowerCase()) ||
+      u.last_name.toLowerCase().includes(search.toLowerCase()) ||
       u.role.toLowerCase().includes(search.toLowerCase()) ||
       u.mobile.includes(search);
     const matchRole = roleFilter === "All Roles" || u.role === roleFilter;
     return matchSearch && matchRole;
   });
+
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const currentItems = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <>
@@ -256,11 +284,11 @@ function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser
                   </td>
                 </tr>
               )}
-              {filtered.map((user, idx) => (
+              {currentItems.map((user, idx) => (
                 <tr
                   key={user.id}
                   style={{
-                    borderBottom: idx < filtered.length - 1 ? "1px solid #F3F4F6" : "none",
+                    borderBottom: idx < currentItems.length - 1 ? "1px solid #F3F4F6" : "none",
                     transition: "background 0.15s",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "#FAFAFA")}
@@ -307,7 +335,7 @@ function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser
                     <div className="flex items-center">
                       <ToggleSwitch
                         active={user.status === "active"}
-                        onToggle={() => toggleStatus(user.id)}
+                        onToggle={() => toggleStatus(user.id, user.status)}
                       />
                     </div>
                   </td>
@@ -357,32 +385,37 @@ function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser
           style={{ borderTop: "1px solid #F3F4F6", background: "#FAFAFA" }}
         >
           <span style={{ fontSize: "0.78rem", color: "#9CA3AF" }}>
-            Showing {filtered.length} of {users.length} accounts
+            Showing {currentItems.length} of {filtered.length} matching accounts
           </span>
           <div className="flex items-center gap-1">
             <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
               style={{
                 padding: "4px 12px",
                 border: "1px solid #E5E7EB",
                 borderRadius: 6,
                 fontSize: "0.78rem",
-                color: "#9CA3AF",
-                background: "#F3F4F6",
-                cursor: "not-allowed",
+                color: currentPage === 1 ? "#9CA3AF" : "#374151",
+                background: currentPage === 1 ? "#F3F4F6" : "#FFFFFF",
+                cursor: currentPage === 1 ? "not-allowed" : "pointer",
                 fontFamily: "Inter, sans-serif",
               }}
             >
               Previous
             </button>
+            <span className="text-xs px-2 text-gray-500">Page {currentPage} of {totalPages}</span>
             <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
               style={{
                 padding: "4px 12px",
                 border: "1px solid #E5E7EB",
                 borderRadius: 6,
                 fontSize: "0.78rem",
-                color: "#374151",
-                background: "#FFFFFF",
-                cursor: "pointer",
+                color: currentPage === totalPages ? "#9CA3AF" : "#374151",
+                background: currentPage === totalPages ? "#F3F4F6" : "#FFFFFF",
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
                 fontFamily: "Inter, sans-serif",
               }}
             >
@@ -406,7 +439,7 @@ function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser
                   </span>
                   <ToggleSwitch
                     active={selectedUser.status === 'active'}
-                    onToggle={() => toggleStatus(selectedUser.id)}
+                    onToggle={() => toggleStatus(selectedUser.id, selectedUser.status)}
                   />
                 </div>
                 <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -427,7 +460,7 @@ function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser
                 </div>
                 <div>
                   <h4 className="text-xl font-bold text-gray-900 uppercase tracking-wide">
-                    {selectedUser.firstName} {selectedUser.lastName}
+                    {selectedUser.first_name} {selectedUser.last_name}
                   </h4>
                   <p className="text-sm font-semibold text-[#4B0082] flex items-center gap-1.5 mt-1">
                     {selectedUser.role === "Command Center Officer" ? <Shield size={14} /> : <HardHat size={14} />}
@@ -442,11 +475,11 @@ function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                     <span className="text-xs font-medium text-gray-500">First Name</span>
-                    <span className="text-sm font-semibold text-gray-900">{selectedUser.firstName}</span>
+                    <span className="text-sm font-semibold text-gray-900">{selectedUser.first_name}</span>
                   </div>
                   <div className="flex flex-col gap-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                     <span className="text-xs font-medium text-gray-500">Last Name</span>
-                    <span className="text-sm font-semibold text-gray-900">{selectedUser.lastName}</span>
+                    <span className="text-sm font-semibold text-gray-900">{selectedUser.last_name}</span>
                   </div>
                   <div className="flex flex-col gap-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                     <span className="text-xs font-medium text-gray-500">Mobile Number</span>
@@ -503,18 +536,20 @@ function ActiveDirectoryTab({ users, setUsers }: { readonly users: DirectoryUser
 // ─── Provision New Account Tab ────────────────────────────────────────────────
 function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUser: (u: DirectoryUser) => void, readonly onSuccess: () => void, readonly usersLength: number }) {
   const [form, setForm] = useState<{
-    firstName: string;
-    lastName: string;
+    first_name: string;
+    last_name: string;
     role: string;
     email: string;
     mobile: string;
+    password: string;
     imagePreview: string | null;
   }>({
-    firstName: "",
-    lastName: "",
+    first_name: "",
+    last_name: "",
     role: "",
     email: "",
     mobile: "",
+    password: "",
     imagePreview: null,
   });
 
@@ -549,22 +584,47 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUse
     return `${rolePrefix}-${(Math.floor(Math.random() * 9000) + 1000).toString(16).toUpperCase()}`;
   }, [rolePrefix]);
 
-  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const station = form.role === "Ground Control Staff" ? LRT2_STATIONS[Math.floor(Math.random() * LRT2_STATIONS.length)] : null;
     
-    onAddUser({
-      id: Date.now().toString(),
+    const { data, error } = await supabase.rpc('provision_user', {
+      p_email: form.email,
+      p_password: form.password,
+      p_role: form.role,
+      p_first_name: form.first_name,
+      p_last_name: form.last_name,
+      p_mobile: form.mobile,
+      p_username: autoUsername,
+      p_security_key: autoKey,
+      p_station: station
+    });
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    if (data && data.success === false) {
+      toast.error(data.error || 'Failed to provision user');
+      return;
+    }
+
+    const newUser: DirectoryUser = {
+      id: data.iam_id,
       username: autoUsername,
-      firstName: form.firstName,
-      lastName: form.lastName,
+      first_name: form.first_name,
+      last_name: form.last_name,
       role: form.role,
       email: form.email,
       mobile: form.mobile,
-      status: "active",
-      station: form.role === "Ground Control Staff" ? LRT2_STATIONS[Math.floor(Math.random() * LRT2_STATIONS.length)] : undefined,
-    });
+      security_key: autoKey,
+      station: station || undefined,
+      status: 'active'
+    };
 
-    setForm({ firstName: "", lastName: "", role: "", email: "", mobile: "", imagePreview: null });
+    onAddUser(newUser);
+    setForm({ first_name: "", last_name: "", role: "", email: "", mobile: "", password: "", imagePreview: null });
     onSuccess();
   };
 
@@ -573,9 +633,10 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUse
   const isMobileValid = form.mobile === "" || form.mobile.length === 11;
 
   const isValid = 
-    form.firstName.trim() !== "" && 
-    form.lastName.trim() !== "" && 
+    form.first_name.trim() !== "" && 
+    form.last_name.trim() !== "" && 
     form.role !== "" && 
+    form.password.length >= 6 &&
     hasValidContact &&
     isMobileValid;
 
@@ -620,8 +681,8 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUse
           <input
             id="firstName"
             required
-            value={form.firstName}
-            onChange={(e) => handleChange("firstName", e.target.value)}
+            value={form.first_name}
+            onChange={(e) => handleChange("first_name", e.target.value)}
             placeholder="e.g. Juan"
             style={inputStyle}
             onFocus={(e) => { e.target.style.borderColor = "#4B0082"; e.target.style.boxShadow = "0 0 0 3px rgba(75,0,130,0.1)"; }}
@@ -634,8 +695,8 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUse
           <input
             id="lastName"
             required
-            value={form.lastName}
-            onChange={(e) => handleChange("lastName", e.target.value)}
+            value={form.last_name}
+            onChange={(e) => handleChange("last_name", e.target.value)}
             placeholder="e.g. Dela Cruz"
             style={inputStyle}
             onFocus={(e) => { e.target.style.borderColor = "#4B0082"; e.target.style.boxShadow = "0 0 0 3px rgba(75,0,130,0.1)"; }}
@@ -705,7 +766,7 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUse
               const numbersOnly = e.target.value.replace(/\D/g, '').slice(0, 11);
               handleChange("mobile", numbersOnly);
             }}
-            placeholder="09123456789"
+            placeholder="09171234567"
             style={inputStyle}
             onFocus={(e) => { e.target.style.borderColor = "#4B0082"; e.target.style.boxShadow = "0 0 0 3px rgba(75,0,130,0.1)"; }}
             onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.boxShadow = "none"; }}
@@ -713,6 +774,22 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUse
         </div>
 
         {/* Row 4 */}
+        <div className="col-span-1">
+          <label htmlFor="password" style={labelStyle}>Login Password</label>
+          <input
+            id="password"
+            type="text"
+            required
+            value={form.password}
+            onChange={(e) => handleChange("password", e.target.value)}
+            placeholder="Min 6 characters"
+            style={inputStyle}
+            onFocus={(e) => { e.target.style.borderColor = "#4B0082"; e.target.style.boxShadow = "0 0 0 3px rgba(75,0,130,0.1)"; }}
+            onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.boxShadow = "none"; }}
+          />
+        </div>
+
+        {/* Row 5 */}
         <div className="col-span-1">
           <div style={labelStyle}>Generated Security Key</div>
           <div
@@ -776,7 +853,7 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUse
         <div className="col-span-2 flex items-center justify-end gap-3 pt-2">
           <button
             type="button"
-            onClick={() => setForm({ firstName: "", lastName: "", role: "", email: "", mobile: "", imagePreview: null })}
+            onClick={() => setForm({ first_name: "", last_name: "", role: "", email: "", mobile: "", password: "", imagePreview: null })}
             style={{
               padding: "9px 20px",
               borderRadius: 8,
@@ -817,7 +894,7 @@ function ProvisionTab({ onAddUser, onSuccess, usersLength }: { readonly onAddUse
 }
 
 // ─── Audit Logs Tab ───────────────────────────────────────────────────────────
-function AuditLogsTab() {
+function AuditLogsTab({ logs }: { logs: AuditEntry[] }) {
   const resultConfig = {
     success: { icon: <CheckCircle2 size={14} />, color: "#16A34A", bg: "#F0FDF4", border: "#BBF7D0", label: "SUCCESS" },
     warning: { icon: <AlertTriangle size={14} />,  color: "#CA8A04", bg: "#FEFCE8", border: "#FDE68A", label: "WARNING" },
@@ -840,7 +917,7 @@ function AuditLogsTab() {
           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full"
           style={{ background: "#EDE9FE", color: "#4B0082", fontSize: "0.72rem", fontWeight: 600 }}
         >
-          {AUDIT_LOGS.length} entries
+          {logs.length} entries
         </span>
       </div>
 
@@ -868,23 +945,30 @@ function AuditLogsTab() {
             </tr>
           </thead>
           <tbody>
-            {AUDIT_LOGS.map((entry, idx) => {
+            {logs.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-center py-12 text-gray-400 text-sm">
+                  No audit logs found in the database.
+                </td>
+              </tr>
+            )}
+            {logs.map((entry, idx) => {
               const cfg = resultConfig[entry.result];
               return (
                 <tr
                   key={entry.id}
                   style={{
-                    borderBottom: idx < AUDIT_LOGS.length - 1 ? "1px solid #F3F4F6" : "none",
+                    borderBottom: idx < logs.length - 1 ? "1px solid #F3F4F6" : "none",
                     transition: "background 0.15s",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "#FAFAFA")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <td style={{ padding: "13px 20px", fontFamily: "monospace", fontSize: "0.78rem", color: "#6B7280", whiteSpace: "nowrap" }}>
-                    {entry.timestamp}
+                    {new Date(entry.created_at).toLocaleString()}
                   </td>
                   <td style={{ padding: "13px 20px", fontSize: "0.84rem", fontWeight: 600, color: "#1F2937" }}>
-                    {entry.actor}
+                    {entry.actor_username}
                   </td>
                   <td style={{ padding: "13px 20px" }}>
                     <span
@@ -930,10 +1014,196 @@ function AuditLogsTab() {
 }
 
 // ─── IAM Portal Page ──────────────────────────────────────────────────────────
+// ─── Scraper Feed Tab ────────────────────────────────────────────────────────
+function ScraperFeedTab({ events, onSync }: { events: ScraperEvent[], onSync: () => void }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.max(1, Math.ceil(events.length / ITEMS_PER_PAGE));
+  const currentItems = events.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  return (
+    <div className="bg-white overflow-hidden mt-6 flex flex-col" style={{ borderRadius: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.05)", border: "1px solid #E5E7EB", minHeight: "500px" }}>
+      <div className="px-6 py-5 border-b flex items-center justify-between" style={{ borderColor: "#F3F4F6" }}>
+        <div>
+          <h2 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#111827" }}>Scraping Quality Control</h2>
+          <p style={{ fontSize: "0.78rem", color: "#6B7280", marginTop: 2 }}>Monitor incoming social media and lgu feeds.</p>
+        </div>
+        <button onClick={onSync} className="px-4 py-2 bg-[#4B0082] text-white text-sm font-semibold rounded-lg hover:bg-[#3d006a] transition">
+          Trigger Re-sync
+        </button>
+      </div>
+      <div className="overflow-x-auto flex-1">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr style={{ background: "#F9FAFB", borderBottom: "1px solid #E5E7EB" }}>
+              {["Date", "Source", "Category", "Post Content"].map((h) => (
+                <th key={h} style={{ padding: "11px 20px", textAlign: "left", fontSize: "0.72rem", fontWeight: 600, color: "#6B7280", textTransform: "uppercase" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {events.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center py-12 text-gray-400 text-sm">
+                  No events found in the database.
+                </td>
+              </tr>
+            )}
+            {currentItems.map((ev, idx) => (
+              <tr key={ev.id} style={{ borderBottom: idx < currentItems.length - 1 ? "1px solid #F3F4F6" : "none" }}>
+                <td style={{ padding: "13px 20px", fontSize: "0.78rem", color: "#6B7280", whiteSpace: "nowrap" }}>{new Date(ev.post_date).toLocaleString()}</td>
+                <td style={{ padding: "13px 20px", fontSize: "0.84rem", fontWeight: 600, color: "#1F2937" }}>{ev.source_name}</td>
+                <td style={{ padding: "13px 20px", fontSize: "0.78rem", color: "#4B0082" }}>{ev.category}</td>
+                <td style={{ padding: "13px 20px", fontSize: "0.84rem", color: "#4B5563" }}>{ev.post_text.substring(0, 100)}...</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between px-6 py-3 mt-auto"
+        style={{ borderTop: "1px solid #F3F4F6", background: "#FAFAFA" }}
+      >
+        <span style={{ fontSize: "0.78rem", color: "#9CA3AF" }}>
+          Showing {currentItems.length} of {events.length} records
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            style={{
+              padding: "4px 12px",
+              border: "1px solid #E5E7EB",
+              borderRadius: 6,
+              fontSize: "0.78rem",
+              color: currentPage === 1 ? "#9CA3AF" : "#374151",
+              background: currentPage === 1 ? "#F3F4F6" : "#FFFFFF",
+              cursor: currentPage === 1 ? "not-allowed" : "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+            Previous
+          </button>
+          <span className="text-xs px-2 text-gray-500">Page {currentPage} of {totalPages}</span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            style={{
+              padding: "4px 12px",
+              border: "1px solid #E5E7EB",
+              borderRadius: 6,
+              fontSize: "0.78rem",
+              color: currentPage === totalPages ? "#9CA3AF" : "#374151",
+              background: currentPage === totalPages ? "#F3F4F6" : "#FFFFFF",
+              cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Calendar Monitor Tab ─────────────────────────────────────────────────────
+function CalendarMonitorTab({ tables }: { tables: CalendarMonitor[] }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.max(1, Math.ceil(tables.length / ITEMS_PER_PAGE));
+  const currentItems = tables.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  return (
+    <div className="bg-white overflow-hidden mt-6 flex flex-col" style={{ borderRadius: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.05)", border: "1px solid #E5E7EB", minHeight: "500px" }}>
+      <div className="px-6 py-5 border-b" style={{ borderColor: "#F3F4F6" }}>
+        <h2 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#111827" }}>Calendar Ingestion Monitor</h2>
+        <p style={{ fontSize: "0.78rem", color: "#6B7280", marginTop: 2 }}>Monitor academic calendar scraping jobs.</p>
+      </div>
+      <div className="overflow-x-auto flex-1">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr style={{ background: "#F9FAFB", borderBottom: "1px solid #E5E7EB" }}>
+              {["Table Name", "Rows Processed", "Last Processed At"].map((h) => (
+                <th key={h} style={{ padding: "11px 20px", textAlign: "left", fontSize: "0.72rem", fontWeight: 600, color: "#6B7280", textTransform: "uppercase" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tables.length === 0 && (
+              <tr>
+                <td colSpan={3} className="text-center py-12 text-gray-400 text-sm">
+                  No processed tables found in the database.
+                </td>
+              </tr>
+            )}
+            {currentItems.map((t, idx) => (
+              <tr key={t.table_name} style={{ borderBottom: idx < currentItems.length - 1 ? "1px solid #F3F4F6" : "none" }}>
+                <td style={{ padding: "13px 20px", fontSize: "0.84rem", fontWeight: 600, color: "#1F2937" }}>{t.table_name}</td>
+                <td style={{ padding: "13px 20px", fontSize: "0.84rem", color: "#4B5563" }}>{t.rows_processed}</td>
+                <td style={{ padding: "13px 20px", fontSize: "0.78rem", color: "#6B7280" }}>{new Date(t.last_processed_at).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between px-6 py-3 mt-auto"
+        style={{ borderTop: "1px solid #F3F4F6", background: "#FAFAFA" }}
+      >
+        <span style={{ fontSize: "0.78rem", color: "#9CA3AF" }}>
+          Showing {currentItems.length} of {tables.length} records
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            style={{
+              padding: "4px 12px",
+              border: "1px solid #E5E7EB",
+              borderRadius: 6,
+              fontSize: "0.78rem",
+              color: currentPage === 1 ? "#9CA3AF" : "#374151",
+              background: currentPage === 1 ? "#F3F4F6" : "#FFFFFF",
+              cursor: currentPage === 1 ? "not-allowed" : "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+            Previous
+          </button>
+          <span className="text-xs px-2 text-gray-500">Page {currentPage} of {totalPages}</span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            style={{
+              padding: "4px 12px",
+              border: "1px solid #E5E7EB",
+              borderRadius: 6,
+              fontSize: "0.78rem",
+              color: currentPage === totalPages ? "#9CA3AF" : "#374151",
+              background: currentPage === totalPages ? "#F3F4F6" : "#FFFFFF",
+              cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function IAMPortal() {
-  const [users, setUsers] = useState<DirectoryUser[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<DirectoryUser[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
+  const [scraperEvents, setScraperEvents] = useState<ScraperEvent[]>([]);
+  const [calendarTables, setCalendarTables] = useState<CalendarMonitor[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("active-directory");
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const handleAddUser = (newUser: DirectoryUser) => {
@@ -945,17 +1215,52 @@ export function IAMPortal() {
     setActiveTab("active-directory");
   };
 
-  // Add simple check to prevent direct access without login
   React.useEffect(() => {
-    if (sessionStorage.getItem("isAuthenticated") !== "true") {
-      navigate("/", { replace: true });
-    }
+    const checkAuthAndFetch = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/", { replace: true });
+        return;
+      }
+      
+      const { data: roleData, error: roleError } = await supabase.schema('iam').rpc('current_user_role');
+      if (roleError || roleData !== 'Provision Officer') {
+        console.error("Role Error:", roleError);
+        toast.error("Access Denied: Provision Officer role required.");
+        await supabase.auth.signOut();
+        navigate("/", { replace: true });
+        return;
+      }
+
+      const { data: uData, error: uError } = await supabase.schema('iam').from('users').select('*').order('created_at', { ascending: false });
+      if (uError) console.error("Users Error:", uError);
+      if (uData) setUsers(uData);
+
+      const { data: aData, error: aError } = await supabase.schema('iam').from('audit_logs').select('*').order('created_at', { ascending: false });
+      if (aError) console.error("Audit Logs Error:", aError);
+      if (aData) setAuditLogs(aData);
+      
+      const { data: eData } = await supabase.schema('external').from('academic_lgu_events').select('*').order('post_date', { ascending: false }).limit(50);
+      if (eData) setScraperEvents(eData);
+
+      const { data: cData } = await supabase.schema('external').from('processed_calendar_tables').select('*').order('last_processed_at', { ascending: false });
+      if (cData) setCalendarTables(cData);
+
+      setLoading(false);
+    };
+    checkAuthAndFetch();
   }, [navigate]);
+
+  const handleSyncScraper = async () => {
+     toast.success("Triggered Re-sync of academic LGU events.");
+  };
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "active-directory", label: "Global User Directory",          icon: <Users size={16} /> },
     { id: "provision",        label: "Permission & Role Provisioning", icon: <UserPlus size={16} /> },
-    { id: "audit-logs",       label: "System Audit Logs",              icon: <ClipboardList size={16} /> },
+    { id: "audit-logs",       label: "System Audit Logs",              icon: <Shield size={16} /> },
+    { id: "scraper-feed",     label: "Scraping Quality Control",       icon: <ClipboardList size={16} /> },
+    { id: "calendar-monitor", label: "Calendar Ingestion",             icon: <ClipboardList size={16} /> },
   ];
 
   return (
@@ -1027,9 +1332,15 @@ export function IAMPortal() {
 
           {/* ── Tab Content ── */}
           <div className="flex-1 transition-opacity duration-300">
-            {activeTab === "active-directory" && <ActiveDirectoryTab users={users} setUsers={setUsers} />}
-            {activeTab === "provision"        && <ProvisionTab onAddUser={handleAddUser} onSuccess={handleProvisionSuccess} usersLength={users.length} />}
-            {activeTab === "audit-logs"       && <AuditLogsTab />}
+            {loading ? <div className="p-8 text-center text-gray-500">Loading data...</div> : (
+              <>
+                {activeTab === "active-directory" && <ActiveDirectoryTab users={users} setUsers={setUsers} />}
+                {activeTab === "provision"        && <ProvisionTab onAddUser={handleAddUser} onSuccess={handleProvisionSuccess} usersLength={users.length} />}
+                {activeTab === "audit-logs"       && <AuditLogsTab logs={auditLogs} />}
+                {activeTab === "scraper-feed"     && <ScraperFeedTab events={scraperEvents} onSync={handleSyncScraper} />}
+                {activeTab === "calendar-monitor" && <CalendarMonitorTab tables={calendarTables} />}
+              </>
+            )}
           </div>
           
         </div>
@@ -1058,8 +1369,7 @@ export function IAMPortal() {
               </button>
               <button
                 onClick={() => {
-                  sessionStorage.removeItem("isAuthenticated");
-                  navigate("/");
+                  supabase.auth.signOut().then(() => { sessionStorage.removeItem("isAuthenticated"); navigate("/"); });
                 }}
                 className="flex-1 px-4 py-2.5 bg-red-600 border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-red-700 transition-colors shadow-sm"
                 style={{ cursor: "pointer" }}
